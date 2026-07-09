@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marathon Plan</title>
+</head>
+<body style="margin:0;">
+<div id="app"></div>
+
+<style>
+  #app {
+    --bg: #0c0c0d;
+    --line: rgba(255,255,255,0.10);
+    --line-soft: rgba(255,255,255,0.06);
+    --text: #f3f2ee;
+    --dim: #86868c;
+    --dimmer: #55555a;
+    --accent: #c8362c;
+    --green: #4a9d5c;
+    --display: 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+    --sans: 'Helvetica Neue', Arial, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    padding: 0 18px 70px;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app * { box-sizing: border-box; }
+  .wrap { max-width: 700px; margin: 0 auto; }
+  .sticky-header { position: sticky; top: 0; background: var(--bg); z-index: 20; padding-top: 40px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--line-soft); }
+  .weeks-list { position: relative; z-index: 1; }
+
+  .eyebrow { font-family: var(--mono); font-size: 12.5px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: 0.12em; margin-bottom: 10px; }
+  .eyebrow b { color: var(--text); font-weight: 600; }
+  .title { font-family: var(--display); font-style: normal; font-weight: 900; font-size: 46px;
+    text-transform: uppercase; letter-spacing: -0.02em; margin: 0 0 22px; color: var(--text); }
+  .hr { height: 1px; background: var(--line); margin: 0 0 26px; }
+
+  .legend { display: flex; margin-bottom: 6px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .legend-item { flex: 1; padding: 14px 16px; border-left: 1px solid var(--line-soft); }
+  .legend-item:first-child { border-left: none; }
+  .legend-lbl { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--dim); display: block; margin-bottom: 6px; }
+  .legend-val { font-family: var(--mono); font-size: 14.5px; color: var(--text); line-height: 1.55; }
+  .legend-note { font-size: 12.5px; color: var(--dimmer); margin: 10px 0 28px; font-style: italic; }
+
+  .watch { border-left: 2px solid var(--accent); padding: 4px 0 4px 16px; margin: 0 0 28px; }
+  .watch-lbl { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--accent); display: block; margin-bottom: 5px; }
+  .watch p { font-size: 14px; line-height: 1.6; color: var(--dim); margin: 0; max-width: 540px; }
+
+  .progress-track { position: relative; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 10px;
+    background: linear-gradient(90deg, #6f6fd8 0%, #b9a3e8 20%, #e0a83e 45%, #ea5344 68%, #4a9d5c 100%); }
+  .progress-cover { position: absolute; top: 0; right: 0; height: 100%; background: var(--bg); transition: width 0.6s ease; }
+  .progress-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11.5px; color: var(--dimmer); margin-bottom: 10px; }
+  .progress-meta b { color: var(--green); font-weight: 600; }
+  .phase-line { display: flex; margin-bottom: 30px; }
+  .phase-node { text-align: center; }
+  .phase-label { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dimmer); }
+  .phase-node.active .phase-label { color: var(--text); font-weight: 600; }
+
+
+
+  .week-card { border-bottom: 1px solid var(--line-soft); }
+  .week-card.open { background: rgba(255,255,255,0.04); border: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+    border-radius: 8px; margin: 8px 0; }
+  .week-card, .week-card.open { transition: background 0.3s ease, border-color 0.3s ease, margin 0.3s ease; }
+  .week-head { display: flex; align-items: center; gap: 16px; padding: 16px 14px; cursor: pointer; user-select: none; position: relative; }
+  .week-card.open .week-head { padding: 16px 16px 14px; }
+  .week-head span { transition: color 0.25s ease; }
+  .week-head.open .week-num, .week-head.open .week-dates, .week-head.open .phase-word,
+  .week-head.open .week-mi, .week-head.open .week-progress, .week-head.open .chevron { color: var(--green); }
+  .week-head.complete { opacity: 0.55; }
+  .week-head.complete:after { content: ''; position: absolute; left: 10px; right: 10px; top: 50%; height: 1px; background: var(--dim); opacity: 0.8; }
+  .week-num { font-family: var(--mono); font-size: 13.5px; color: var(--dim); width: 46px; flex-shrink: 0; }
+  .week-dates { font-family: var(--mono); font-size: 13.5px; color: var(--dimmer); width: 96px; flex-shrink: 0; }
+  .phase-word { font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--dimmer); width: 58px; flex-shrink: 0; }
+  .week-mi { font-family: var(--mono); font-size: 14.5px; color: var(--text); margin-left: auto; flex-shrink: 0; }
+  .week-progress { font-family: var(--mono); font-size: 12.5px; color: var(--dimmer); width: 42px; text-align: right; flex-shrink: 0; }
+  .chevron { width: 12px; flex-shrink: 0; color: var(--dimmer); transition: transform 0.15s; font-family: var(--mono); }
+  .chevron.open { transform: rotate(90deg); }
+
+  .week-body-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.38s cubic-bezier(0.4,0,0.2,1); }
+  .week-body-wrap.open { grid-template-rows: 1fr; }
+  .week-body-wrap > .week-body { overflow: hidden; min-height: 0; }
+  .week-body { padding: 0 16px 16px; }
+  .run-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line-soft); opacity: 0; transform: translateY(-4px); transition: opacity 0.3s ease 0.08s, transform 0.3s ease 0.08s; }
+  .week-body-wrap.open .run-item { opacity: 1; transform: translateY(0); }
+  .run-main { flex: 1; padding-top: 1px; }
+  .run-row { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+  input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none; width: 17px; height: 17px; border: 1px solid var(--dimmer);
+    margin-top: 3px; flex-shrink: 0; cursor: pointer; position: relative; background: transparent;
+  }
+  input[type="checkbox"]:checked { background: var(--green); border-color: var(--green); }
+  input[type="checkbox"]:checked:after {
+    content: ''; position: absolute; left: 5px; top: 2px; width: 4px; height: 9px;
+    border: solid #0c0c0d; border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+
+  .type-label { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 3px 8px; border-radius: 2px; transition: opacity 0.25s ease; }
+  .type-label.easy, .type-label.shakeout { background: #241f33; color: #b9a3e8; }
+  .type-label.long { background: #332a12; color: #e0a83e; font-weight: 700; }
+  .type-label.tempo { background: #331411; color: #ea5344; font-weight: 700; }
+  .type-label.strength { background: #12212e; color: #6fa8d0; }
+  .type-label.prehab { background: #14261b; color: #6ec98a; }
+  .type-label.race { background: var(--accent); color: #0c0c0d; font-weight: 700; letter-spacing: 0.1em; }
+
+  .run-dist { font-family: var(--mono); font-size: 14.5px; color: var(--text); transition: opacity 0.25s ease; }
+  .run-target { font-family: var(--mono); font-size: 13px; color: var(--dimmer); transition: opacity 0.25s ease; }
+  .run-when { font-family: var(--mono); font-size: 12px; color: var(--accent); margin-left: auto; }
+  .checked .run-dist, .checked .run-target, .checked .type-label { opacity: 0.35; }
+
+  details.info { margin-top: 5px; }
+  details.info summary {
+    font-family: var(--mono); font-size: 11.5px; color: var(--dimmer); cursor: pointer; list-style: none;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  details.info summary::-webkit-details-marker { display: none; }
+  .info-icon { display: inline-block; width: 9px; text-align: center; transition: transform 0.15s; color: var(--dimmer); }
+  details.info[open] .info-icon { transform: rotate(45deg); }
+  details.info p { font-size: 13.5px; color: var(--dim); line-height: 1.6; margin: 8px 0 2px; max-width: 500px; }
+
+  @media (max-width: 480px) {
+    .title { font-size: 28px; }
+    .week-dates { display: none; }
+    .legend { flex-direction: column; }
+    .legend-item { border-left: none; border-top: 1px solid var(--line-soft); }
+    .legend-item:first-child { border-top: none; }
+    .sticky-header { position: static; padding-top: 0; }
+  }
+</style>
+
+<script>
+(function() {
+  const START = new Date('2026-07-06T00:00:00');
+  const STORAGE_KEY = 'plan-checked';
+  let checked = {};
+  let openWeeks = new Set();
+
+  const WEEKS = [
+    {n:1,total:14,long:6,tempo:false,phase:'Base'},
+    {n:2,total:16,long:7,tempo:false,phase:'Base'},
+    {n:3,total:18,long:8,tempo:false,phase:'Base'},
+    {n:4,total:14,long:6,tempo:false,phase:'Base'},
+    {n:5,total:19,long:9,tempo:true,phase:'Build'},
+    {n:6,total:21,long:10,tempo:true,phase:'Build'},
+    {n:7,total:23,long:11,tempo:true,phase:'Build'},
+    {n:8,total:17,long:8,tempo:true,phase:'Build'},
+    {n:9,total:25,long:12,tempo:true,phase:'Build'},
+    {n:10,total:27,long:13,tempo:true,phase:'Build'},
+    {n:11,total:26,long:13,tempo:true,phase:'Peak'},
+    {n:12,total:28,long:14,tempo:true,phase:'Peak'},
+    {n:13,total:30,long:16,tempo:true,phase:'Peak'},
+    {n:14,total:22,long:10,tempo:true,phase:'Peak'},
+    {n:15,total:32,long:17,tempo:true,phase:'Peak'},
+    {n:16,total:34,long:18,tempo:true,phase:'Peak'},
+    {n:17,total:36,long:20,tempo:true,phase:'Peak'},
+    {n:18,total:26,long:13,tempo:true,phase:'Peak'},
+    {n:19,total:20,long:10,tempo:true,phase:'Taper'},
+    {n:20,total:14,long:8,tempo:false,phase:'Taper'},
+  ];
+
+  const PACE = { easy: '9:15–9:45/mi', longp: '8:45–9:15/mi', tempo: '7:50–8:10/mi', shakeout: '9:15–9:45/mi' };
+  const HR = { easy: '130–150 bpm', longp: '145–158 bpm', tempo: '163–173 bpm', shakeout: '130–150 bpm' };
+
+  const INFO = {
+    easy: "Conversational pace — you should be able to talk in full sentences the whole way. Don't chase the number; let effort set the speed.",
+    long: "Bulk of the miles at easy effort.LONGNOTE Hydrate and fuel like race day once you're past 90 minutes.",
+    tempo: "10–15 min easy warm-up, then settle into a comfortably-hard, sustainable effort for the tempo portion, then 10 min easy cooldown. This is the one day it's fine to run near the top of your HR range.",
+    shakeout: "Short and easy, just enough to keep the legs loose. Add a few relaxed strides at the end if you're feeling good.",
+    strength: "Full-body, compound-focused (squat/hinge, press, pull). Skip the day right before or after your long run or tempo.",
+    prehab: "Your banded work, single-leg exercises, and hip-abductor circuit. Keep this non-negotiable as mileage climbs — it's what's kept the hip issue away.",
+    race: "Trust the taper. Go out conservative — the last 10k is where staying disciplined through the first 20 miles pays off."
+  };
+
+  const SUMMARY_TEXT = {
+    easy: 'how to run this', long: 'how to run this', tempo: 'how to run this', shakeout: 'how to run this',
+    race: 'how to race this', strength: 'how to lift this', prehab: 'how to rehab this'
+  };
+
+  function weekStart(n) { return new Date(START.getTime() + (n-1)*7*86400000); }
+  function fmtRange(n) {
+    const origStart = weekStart(n);
+    const s = (n === 1) ? new Date('2026-07-08T00:00:00') : origStart;
+    const e = new Date(origStart.getTime() + 6*86400000);
+    const sameMonth = s.getMonth() === e.getMonth();
+    if (sameMonth) return s.toLocaleDateString('en-US',{month:'short'}) + ' ' + s.getDate() + '–' + e.getDate();
+    return s.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + '–' + e.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }
+  function currentWeekNum() {
+    const days = Math.floor((new Date() - START) / 86400000);
+    const n = Math.floor(days/7) + 1;
+    return Math.max(1, Math.min(21, n));
+  }
+
+  function buildRuns(w) {
+    const runs = [];
+    runs.push({id:'w'+w.n+'-long', type:'long', distance:w.long, when:'Sun'});
+    let tempoDist = 0;
+    if (w.tempo) {
+      tempoDist = Math.min(8, Math.max(4, Math.round(w.long*0.4)));
+      runs.push({id:'w'+w.n+'-tempo', type:'tempo', distance:tempoDist, when:'Wed'});
+    }
+    const remaining = w.total - w.long - tempoDist;
+    const numEasy = remaining > 13 ? 3 : (remaining > 0 ? 2 : 0);
+    const easyDays = w.tempo ? ['Tue','Fri','Sat'] : ['Tue','Wed','Fri'];
+    if (numEasy > 0) {
+      let base = Math.round((remaining/numEasy)*2)/2;
+      let sum = 0;
+      for (let i=0; i<numEasy; i++) {
+        const d = (i === numEasy-1) ? Math.round((remaining-sum)*2)/2 : base;
+        sum += d;
+        runs.push({id:'w'+w.n+'-easy-'+i, type:'easy', distance: Math.max(2,d), when: easyDays[i] || 'Tue'});
+      }
+    }
+    runs.push({id:'w'+w.n+'-strength-0', type:'strength', when:'Mon'});
+    runs.push({id:'w'+w.n+'-strength-1', type:'strength', when:'Thu'});
+    runs.push({id:'w'+w.n+'-prehab-0', type:'prehab', when:'Mon'});
+
+    if (w.n === 1) {
+      const overrides = {
+        'w1-long': 'Wed', 'w1-easy-0': 'Fri', 'w1-easy-1': 'Sun',
+        'w1-strength-0': 'Thu', 'w1-strength-1': 'Sat', 'w1-prehab-0': 'Thu'
+      };
+      runs.forEach(r => { if (overrides[r.id]) r.when = overrides[r.id]; });
+    }
+
+    const DAY_ORDER = {Mon:0,Tue:1,Wed:2,Thu:3,Fri:4,Sat:5,Sun:6};
+    runs.sort((a,b) => DAY_ORDER[a.when] - DAY_ORDER[b.when]);
+    return runs;
+  }
+
+  const RACE_WEEK = {
+    n: 21, phase: 'Race',
+    runs: [
+      {id:'w21-easy-0', type:'easy', distance:3, when:'Mon'},
+      {id:'w21-prehab-0', type:'prehab', when:'Wed — light'},
+      {id:'w21-shakeout-0', type:'shakeout', distance:2, when:'Fri'},
+      {id:'w21-race-0', type:'race', distance:26.2, when:'SUN — RACE DAY'},
+    ]
+  };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      checked = raw ? JSON.parse(raw) : {};
+    } catch(e) { checked = {}; }
+    const cw = currentWeekNum();
+    openWeeks.add(cw <= 20 ? cw : 21);
+    render();
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(checked)); } catch(e) {}
+  }
+
+  function computeProgress() {
+    const phaseOrder = ['Base','Build','Peak','Taper','Race'];
+    const phaseTotals = {Base:0,Build:0,Peak:0,Taper:0,Race:0};
+    let total = 0, done = 0;
+    WEEKS.forEach(w => {
+      const runs = buildRuns(w);
+      phaseTotals[w.phase] += runs.length;
+      total += runs.length;
+      done += runs.filter(r => checked[r.id]).length;
+    });
+    phaseTotals.Race += RACE_WEEK.runs.length;
+    total += RACE_WEEK.runs.length;
+    done += RACE_WEEK.runs.filter(r => checked[r.id]).length;
+    const pct = total ? (done/total*100) : 0;
+    let cum = 0;
+    const bounds = {};
+    phaseOrder.forEach(p => { cum += phaseTotals[p]; bounds[p] = cum/total*100; });
+    let activePhase = 'Base';
+    for (const p of phaseOrder) { if (pct <= bounds[p] + 0.0001) { activePhase = p; break; } activePhase = p; }
+    return { total, done, pct, phaseTotals, phaseOrder, activePhase };
+  }
+
+  function toggleWeek(n) {
+    const wasOpen = openWeeks.has(n);
+    if (wasOpen) openWeeks.delete(n); else openWeeks.add(n);
+    const nowOpen = !wasOpen;
+    const card = document.querySelector('[data-week-card="' + n + '"]');
+    if (!card) { render(); return; }
+    card.classList.toggle('open', nowOpen);
+    const head = card.querySelector('.week-head');
+    head.classList.toggle('open', nowOpen);
+    const chevron = head.querySelector('.chevron');
+    chevron.classList.toggle('open', nowOpen);
+    const wrap = card.querySelector('.week-body-wrap');
+    wrap.classList.toggle('open', nowOpen);
+  }
+  function toggleCheck(id) {
+    checked[id] = !checked[id];
+    save();
+
+    const checkbox = document.querySelector('input[data-id="' + id + '"]');
+    if (checkbox) {
+      checkbox.checked = checked[id];
+      const item = checkbox.closest('.run-item');
+      if (item) item.classList.toggle('checked', checked[id]);
+    }
+
+    const match = id.match(/^w(\d+)-/);
+    if (match) {
+      const n = parseInt(match[1]);
+      const card = document.querySelector('[data-week-card="' + n + '"]');
+      if (card) {
+        const runs = (n === 21) ? RACE_WEEK.runs : buildRuns(WEEKS[n-1]);
+        const done = runs.filter(r => checked[r.id]).length;
+        const isComplete = done === runs.length && runs.length > 0;
+        const head = card.querySelector('.week-head');
+        head.classList.toggle('complete', isComplete);
+        const progEl = head.querySelector('.week-progress');
+        if (progEl) progEl.textContent = done + '/' + runs.length;
+      }
+    }
+
+    const prog = computeProgress();
+    const cover = document.querySelector('.progress-cover');
+    if (cover) cover.style.width = (100 - prog.pct) + '%';
+    const meta = document.querySelector('.progress-meta');
+    if (meta) meta.innerHTML = '<span>' + prog.done + ' / ' + prog.total + ' sessions</span>';
+    document.querySelectorAll('.phase-node').forEach(node => {
+      node.classList.toggle('active', node.getAttribute('data-phase') === prog.activePhase);
+    });
+  }
+
+  function runInfoText(type, run) {
+    if (type === 'long') {
+      const note = (run.distance >= 16) ? ' Finish the last 3–4 miles near marathon pace (8:45–9:00/mi).' : '';
+      return INFO.long.replace('LONGNOTE', note);
+    }
+    return INFO[type];
+  }
+
+  function renderRun(run) {
+    const isChecked = !!checked[run.id];
+    const targetPace = run.type === 'long' ? PACE.longp : PACE[run.type];
+    const targetHR = run.type === 'long' ? HR.longp : HR[run.type];
+    let mainLine = '';
+    if (run.type === 'strength') {
+      mainLine = '<span class="type-label strength">Strength</span><span class="run-target">full body, 45–60 min</span>';
+    } else if (run.type === 'prehab') {
+      mainLine = '<span class="type-label prehab">Prehab</span><span class="run-target">band + single-leg + hip circuit</span>';
+    } else if (run.type === 'race') {
+      mainLine = '<span class="type-label race">Race</span><span class="run-dist">' + run.distance + ' mi</span>';
+    } else {
+      const labelText = run.type.charAt(0).toUpperCase() + run.type.slice(1);
+      mainLine = '<span class="type-label ' + run.type + '">' + labelText + '</span>'
+        + '<span class="run-dist">' + run.distance + ' mi</span>'
+        + '<span class="run-target">' + targetPace + ' · ' + targetHR + '</span>';
+    }
+    const when = run.when ? '<span class="run-when">' + run.when + '</span>' : '';
+    const info = INFO[run.type] ? (
+      '<details class="info"><summary><span class="info-icon">+</span>' + SUMMARY_TEXT[run.type] + '</summary><p>' + runInfoText(run.type, run) + '</p></details>'
+    ) : '';
+    return '<div class="run-item ' + (isChecked ? 'checked' : '') + '">'
+      + '<input type="checkbox" ' + (isChecked ? 'checked' : '') + ' data-id="' + run.id + '">'
+      + '<div class="run-main"><div class="run-row">' + mainLine + when + '</div>' + info + '</div>'
+      + '</div>';
+  }
+
+  function renderWeekCard(w, runs) {
+    const isOpen = openWeeks.has(w.n);
+    const done = runs.filter(r => checked[r.id]).length;
+    const isComplete = done === runs.length && runs.length > 0;
+    const total = w.total !== undefined ? w.total + ' mi' : '';
+    const headClasses = ['week-head', isOpen ? 'open' : '', isComplete ? 'complete' : ''].filter(Boolean).join(' ');
+    const cardClasses = ['week-card', isOpen ? 'open' : ''].filter(Boolean).join(' ');
+    return '<div class="' + cardClasses + '" data-week-card="' + w.n + '">'
+      + '<div class="' + headClasses + '" data-week="' + w.n + '">'
+      + '<span class="week-num">WK ' + String(w.n).padStart(2,'0') + '</span>'
+      + '<span class="week-dates">' + fmtRange(w.n) + '</span>'
+      + '<span class="phase-word">' + w.phase + '</span>'
+      + '<span class="week-mi">' + total + '</span>'
+      + '<span class="week-progress">' + done + '/' + runs.length + '</span>'
+      + '<span class="chevron ' + (isOpen ? 'open' : '') + '">›</span>'
+      + '</div>'
+      + '<div class="week-body-wrap ' + (isOpen ? 'open' : '') + '"><div class="week-body">' + runs.map(renderRun).join('') + '</div></div>'
+      + '</div>';
+  }
+
+  function render() {
+    const app = document.getElementById('app');
+    const prog = computeProgress();
+    const daysOut = Math.max(0, Math.ceil((new Date('2026-11-29') - new Date()) / 86400000));
+
+    app.innerHTML =
+      '<div class="wrap">'
+      + '<div class="sticky-header">'
+      + '<div class="eyebrow">Training plan · Jul 6 → Nov 29 · <b>' + daysOut + ' days out</b></div>'
+      + '<h1 class="title">Marathon Plan</h1>'
+      + '<div class="hr"></div>'
+
+      + '<div class="legend">'
+        + '<div class="legend-item"><span class="legend-lbl">Easy</span><span class="legend-val">' + PACE.easy + '<br>' + HR.easy + '</span></div>'
+        + '<div class="legend-item"><span class="legend-lbl">Long run</span><span class="legend-val">' + PACE.longp + '<br>' + HR.longp + '</span></div>'
+        + '<div class="legend-item"><span class="legend-lbl">Tempo</span><span class="legend-val">' + PACE.tempo + '<br>' + HR.tempo + '</span></div>'
+      + '</div>'
+      + '<div class="legend-note">Estimated from what you\'ve told me — treat as ranges, not rules, and adjust by feel.</div>'
+
+      + '<div class="watch"><span class="watch-lbl">Watch list</span><p>Hips (both sides) and front shins, especially after 6mi+. Keep prehab in every single week, don\'t skip warm-ups, and back off immediately if pain sharpens, shows up during a run rather than after, or lingers past a day.</p></div>'
+
+      + '<div class="progress-track"><div class="progress-cover" style="width:' + (100 - prog.pct) + '%"></div></div>'
+      + '<div class="progress-meta"><span>' + prog.done + ' / ' + prog.total + ' sessions</span></div>'
+      + '<div class="phase-line">' + prog.phaseOrder.map(p =>
+          '<div class="phase-node ' + (p === prog.activePhase ? 'active' : '') + '" data-phase="' + p + '" style="width:' + (prog.phaseTotals[p]/prog.total*100) + '%"><span class="phase-label">' + p + '</span></div>'
+        ).join('') + '</div>'
+
+      + '</div>'
+
+      + '<div class="weeks-list">'
+      + WEEKS.map(w => renderWeekCard(w, buildRuns(w))).join('')
+      + renderWeekCard(RACE_WEEK, RACE_WEEK.runs)
+      + '</div>'
+
+      + '</div>';
+
+    app.querySelectorAll('.week-head').forEach(el => {
+      el.addEventListener('click', () => toggleWeek(parseInt(el.getAttribute('data-week'))));
+    });
+    app.querySelectorAll('input[type="checkbox"]').forEach(el => {
+      el.addEventListener('click', (e) => { e.stopPropagation(); toggleCheck(el.getAttribute('data-id')); });
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
